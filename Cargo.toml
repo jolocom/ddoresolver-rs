@@ -1,6 +1,9 @@
 [package]
 name = "ddoresolver-rs"
 version = "0.1.0"
+documentation = ""
+repository = "https://github.com/jolocom/ddoresolver-rs"
+readme = "README.md"
 authors = ["Ivan Temchenko <35359595i@gmail.com>"]
 edition = "2018"
 
