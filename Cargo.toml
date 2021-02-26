@@ -1,7 +1,7 @@
 [package]
 name = "ddoresolver-rs"
 version = "0.1.0"
-documentation = ""
+documentation = "https://docs.rs/ddoresolver-rs"
 description = "function to resolve did document from url"
 license = "Apache-2.0"
 repository = "https://github.com/jolocom/ddoresolver-rs"
