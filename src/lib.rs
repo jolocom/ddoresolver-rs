@@ -38,6 +38,10 @@ pub trait DdoParser {
     /// Returns `None` if no matching result found instead of error.
     ///
     fn find_public_key_id_for_curve(&self, curve: &str) -> Option<String>;
+    /// Resolve controller for specified curve if it's present in `VerificationMethod`s list
+    /// Returns `None` if no matching curve found.
+    ///
+    fn find_public_key_controller_for_curve(&self, curve: &str) -> Option<String>;
 }
 
 /// Unit struct which have implementations of `DdoParser` and `DdoResolver`
@@ -87,6 +91,12 @@ impl DdoParser for Document {
                 KeyFormat::JWK(key) => key.key_id,
                 _ => None
             },
+            None => None
+        }
+    }
+    fn find_public_key_controller_for_curve(&self, curve: &str) -> Option<String> {
+        match self.verification_method.iter().find(|vm| vm.key_type.contains(curve)) {
+            Some(vm) => Some(vm.controller.to_owned()),
             None => None
         }
     }
