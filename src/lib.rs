@@ -1,7 +1,14 @@
 pub mod error;
 
+#[cfg(feature = "keriox")]
+pub mod keri;
+#[cfg(feature = "didkey")]
+pub mod key;
+#[cfg(feature = "didkey")]
+use key::DidKeyResolver;
+
+pub use did_key::{Document, KeyFormat, VerificationMethod};
 use base58::FromBase58;
-pub use did_key::*;
 use error::Error;
 use serde::{Serialize, Deserialize};
 
@@ -16,7 +23,7 @@ pub trait DdoResolver {
     ///     method name, path, etc. Details in spec:
     ///     https://www.w3.org/TR/did-core/#did-url-syntax
     /// 
-    fn resolve(did_url: &str) -> Result<Document, Error>;
+    fn resolve(&self, did_url: &str) -> Result<Document, Error>;
 }
 
 /// # Universal trait for DID document parser methods.
@@ -44,22 +51,6 @@ pub trait DdoParser {
     fn find_public_key_controller_for_curve(&self, curve: &str) -> Option<String>;
 }
 
-/// Unit struct which have implementations of `DdoParser` and `DdoResolver`
-///     traits for `did:key` document resolver.
-///
-#[cfg(feature = "didkey")]
-pub struct DidKeyResolver{}
-
-#[cfg(feature = "didkey")]
-impl DdoResolver for DidKeyResolver {
-    fn resolve(did_url: &str) -> Result<Document, Error> {
-        let key = did_key::resolve(did_url)
-            .map_err(|e| error::Error::DidKeyError(format!("{:?}", e)))?;
-        Ok(key.get_did_document(did_key::CONFIG_LD_PUBLIC))
-    }
-}
-
-#[cfg(feature = "didkey")]
 impl DdoParser for Document {
     fn find_key_agreement(&self, pattern: &str) -> Option<KeyAgreement> {
         let agreements = self.key_agreement.clone();
@@ -114,7 +105,8 @@ pub fn try_resolve_any(did_url: &str) -> Result<Document, Error> {
     match re.captures(did_url) {
         Some(caps) => {
             match &caps["method"] {
-                "key" => DidKeyResolver::resolve(did_url)
+                #[cfg(feature = "didkey")]
+                "key" => DidKeyResolver{}.resolve(did_url)
                     .map_err(|e| error::Error::DidKeyError(e.to_string())),
                 _ => Err(error::Error::DidKeyError("not supported key url".into())) // TODO: separate descriptive error
             }
@@ -134,17 +126,18 @@ pub fn resolve_any(did_url: &str) -> Option<Document> {
     let re = regex::Regex::new(r"(?x)(?P<prefix>[did]{3}):(?P<method>[a-z]*):").unwrap();
     match re.captures(did_url) {
         Some(caps) => {
-            match &caps["method"] {
+            let resolver = match &caps["method"] {
                 #[cfg(feature = "didkey")]
-                "key" => { if let Ok(doc) = DidKeyResolver::resolve(did_url) {
-                        Some(doc)
-                    } else { None }
-                },
+                "key" => DidKeyResolver{},
                 #[cfg(feature = "didjolo")]
                 "jolo" => {},
                 #[cfg(feature = "didweb")]
                 "web" => {},
-                _ => None
+                _ => return None
+            };
+            match resolver.resolve(did_url) {
+                Ok(doc) => Some(doc),
+                Err(_) => None
             }
         },
         None => None,
@@ -153,19 +146,19 @@ pub fn resolve_any(did_url: &str) -> Option<Document> {
 
 // FIXME: complete this implementation
 pub fn get_sign_and_crypto_keys<'a>(ddo: &'a Document) -> (Option<&'a [u8]>, Option<&'a [u8]>) {
-    let sign_key= ddo.verification_method.iter().fold(
+    let _sign_key= ddo.verification_method.iter().fold(
         None,
         |_, vm| vm.public_key.iter().find(
             |k| match k {
                 KeyFormat::JWK(key) => key.curve == "Ed25519",
                 _ => false
             }));
-    let crypto_key = ddo.verification_method.iter().find(|vm| vm.key_type == "X25519");
+    let _crypto_key = ddo.verification_method.iter().find(|vm| vm.key_type == "X25519");
     (None, None)
 }
 
 // Helper function to get full `KeyFormat` from the document by it's curve type
-fn get_public_key(doc: &Document, curve: &str) -> Option<KeyFormat> {
+pub(crate) fn get_public_key(doc: &Document, curve: &str) -> Option<KeyFormat> {
     match doc.verification_method.iter().find(|m| {
         match &m.public_key {
             Some(KeyFormat::JWK(jwk)) => jwk.curve.contains(curve),
@@ -174,6 +167,22 @@ fn get_public_key(doc: &Document, curve: &str) -> Option<KeyFormat> {
     }) {
         Some(vm) => vm.public_key.clone(),
         None => None
+    }
+}
+
+// Helper function to get key id from did url
+// # + id
+pub(crate) fn key_id_from_didurl(url: &str) -> String {
+    let re = regex::Regex::new(r"(?x)(?P<prefix>[did]{3}):(?P<method>[a-z]*):(?P<key_id>[a-zA-Z0-9]*)([:?/]?)(\S)*$").unwrap();
+    match  re.captures(url) {
+        Some(s) =>
+            match s.name("key_id") {
+                Some(name) =>
+                    format!("#{}", name.as_str()),
+                None => String::default(),
+            },
+        None =>
+            String::default()
     }
 }
 
@@ -189,35 +198,3 @@ pub struct KeyAgreement {
     pub public_key_base58: String,
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn did_key_resolve_raw_test() {
-        let k = did_key::resolve("did:key:z6MkiTBz1ymuepAQ4HEHYSF1H8quG5GLVVQR3djdX3mDooWp");
-        assert!(k.is_ok());
-        let doc = k.unwrap().get_did_document(did_key::CONFIG_LD_PUBLIC);
-        println!("{:?}", doc);
-    }
-
-    #[test]
-    fn did_key_resolve_trait_test() {
-        let r = DidKeyResolver::resolve("did:key:z6MkiTBz1ymuepAQ4HEHYSF1H8quG5GLVVQR3djdX3mDooWp");
-        assert!(r.is_ok());
-    }
-
-    #[test]
-    fn resolve_any_test() {
-        let d = resolve_any("did:key:z6MkiTBz1ymuepAQ4HEHYSF1H8quG5GLVVQR3djdX3mDooWp");
-        assert!(d.is_some());
-    }
-
-    #[test]
-    fn public_key_by_type_search_test() {
-        let d = resolve_any("did:key:z6MkiTBz1ymuepAQ4HEHYSF1H8quG5GLVVQR3djdX3mDooWp");
-        assert!(d.is_some());
-        let k = d.unwrap().find_public_key_for_curve("X25519");
-        assert!(k.is_some());
-    }
-}
