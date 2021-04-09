@@ -1,6 +1,6 @@
 [package]
 name = "ddoresolver-rs"
-version = "0.2.0"
+version = "0.2.1"
 documentation = "https://docs.rs/ddoresolver-rs"
 description = "function to resolve did document from url"
 license = "Apache-2.0"
@@ -21,6 +21,9 @@ serde = { version = "1.0", features = ["derive"] }
 base58 = "0.1.0"
 
 funty = "=1.1.0"
+
+[dev-dependencies]
+x25519-dalek = "1.1.0"
 
 [features]
 default = ["didkey", "keriox"]
