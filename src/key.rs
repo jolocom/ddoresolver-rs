@@ -29,8 +29,7 @@ mod did_key_tests {
     fn did_key_resolve_raw_test() {
         let k = did_key::resolve("did:key:z6MkiTBz1ymuepAQ4HEHYSF1H8quG5GLVVQR3djdX3mDooWp");
         assert!(k.is_ok());
-        let doc = k.unwrap().get_did_document(did_key::CONFIG_LD_PUBLIC);
-        println!("{:?}", doc);
+        let _doc = k.unwrap().get_did_document(did_key::CONFIG_LD_PUBLIC);
     }
 
     #[test]

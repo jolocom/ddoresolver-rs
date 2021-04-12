@@ -84,7 +84,12 @@ fn mem_parse(kel: impl AsRef<[u8]>) -> IdentifierState {
 #[cfg(test)]
 mod did_keri_tests {
     use super::*;
-    use crate::DdoParser;
+    use crate::{
+        DdoParser,
+        resolve_any,
+        try_resolve_any,
+    };
+    use base64_url::encode;
 
     #[test]
     fn public_key_by_type_search_ed25519_test() {
@@ -123,6 +128,29 @@ mod did_keri_tests {
         let ss = StaticSecret::from(private_key);
         let pk = PublicKey::from(&ss);
         assert_eq!(&pk.to_bytes().to_vec(), &k);
+    }
+
+    #[test]
+    fn resolve_any_keri_test() {
+        let kerl_str = r#"{"v":"KERI10JSON000115_","i":"Eh9Gq4--Q1OVxJEL7M49-a5k7iEJATqSAxQiRLwJEja4","s":"0","t":"icp","kt":"1","k":["D7sD1K7bTfG4E8ObJa4Ecd6zuML1diINCvKXy_o1FK60","CFyJrFXQYvDYiK0c7CLIisfq6xO-D0gqjW0ThtVKObHs"],"n":"E1IzcG1u6Iy5onwrCG1AKcj9KUJ-0rbMq_t6yViIgv2U","wt":"0","w":[],"c":[]}-AABAAlccRMa44Jo07A_fuOwDP6Fu9_3PArGIKYCo7F9U8OC_02d5p26LuenliVDkmp7DV9hyYUHeWIug6PsIZlUlKAg"#;
+        let full_kerl_with_url = format!("did:keri:Eh9Gq4--Q1OVxJEL7M49-a5k7iEJATqSAxQiRLwJEja4?kerl={}", encode(kerl_str));
+        let res = resolve_any(&full_kerl_with_url);
+        assert!(res.is_some());
+        let doc = res.unwrap();
+        println!("{:?}", &doc);
+        let key = doc.find_public_key_for_curve("X25519");
+        assert!(key.is_some());
+    }
+
+    #[test]
+    fn try_resolve_any_keri_test() {
+        let kerl_str = r#"{"v":"KERI10JSON000115_","i":"Eh9Gq4--Q1OVxJEL7M49-a5k7iEJATqSAxQiRLwJEja4","s":"0","t":"icp","kt":"1","k":["D7sD1K7bTfG4E8ObJa4Ecd6zuML1diINCvKXy_o1FK60","CFyJrFXQYvDYiK0c7CLIisfq6xO-D0gqjW0ThtVKObHs"],"n":"E1IzcG1u6Iy5onwrCG1AKcj9KUJ-0rbMq_t6yViIgv2U","wt":"0","w":[],"c":[]}-AABAAlccRMa44Jo07A_fuOwDP6Fu9_3PArGIKYCo7F9U8OC_02d5p26LuenliVDkmp7DV9hyYUHeWIug6PsIZlUlKAg"#;
+        let full_kerl_with_url = format!("did:keri:Eh9Gq4--Q1OVxJEL7M49-a5k7iEJATqSAxQiRLwJEja4?kerl={}", encode(kerl_str));
+        let res = try_resolve_any(&full_kerl_with_url);
+        assert!(res.is_ok());
+        let doc = res.unwrap();
+        let key = doc.find_public_key_for_curve("X25519");
+        assert!(key.is_some());
     }
 }
 
