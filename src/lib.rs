@@ -6,6 +6,8 @@ pub mod keri;
 pub mod key;
 #[cfg(feature = "didkey")]
 use key::DidKeyResolver;
+#[cfg(feature = "keriox")]
+use crate::keri::DidKeriResolver;
 
 pub use did_key::{Document, KeyFormat, VerificationMethod};
 use base58::FromBase58;
@@ -101,13 +103,24 @@ impl DdoParser for Document {
 /// Output is `Document` or `Error`.
 ///
 pub fn try_resolve_any(did_url: &str) -> Result<Document, Error> {
-    let re = regex::Regex::new(r"(?x)(?P<prefix>[did]{3}):(?P<method>[a-z]*):").unwrap();
+    let re = regex::Regex::new(r"(?x)(?P<prefix>did):(?P<method>[a-z]*){1}:(?P<id>.*)(?P<kerlid>\?kerl=)(?P<kerl>[a-zA-Z0-9]*)").unwrap();
     match re.captures(did_url) {
         Some(caps) => {
             match &caps["method"] {
                 #[cfg(feature = "didkey")]
                 "key" => DidKeyResolver{}.resolve(did_url)
                     .map_err(|e| error::Error::DidKeyError(e.to_string())),
+                #[cfg(feature = "keriox")]
+                "keri" => {
+                    match &caps["kerlid"] {
+                        "" => Err(error::Error::DidKeriError("kerl id not found".into())),
+                        _ => match &caps["kerl"] {
+                            "" => Err(error::Error::DidKeriError("kerl not found".into())),
+                            _ => DidKeriResolver::new(&String::from_utf8_lossy(&base64_url::decode(&caps["kerl"])?))
+                                    .resolve(&format!("did:keri:{}", &caps["id"]))
+                        }
+                    }
+                },
                 _ => Err(error::Error::DidKeyError("not supported key url".into())) // TODO: separate descriptive error
             }
         },
@@ -123,19 +136,23 @@ pub fn try_resolve_any(did_url: &str) -> Result<Document, Error> {
 /// Output is Option: `Some(Document)` or `None`. Will never fail with error.
 ///
 pub fn resolve_any(did_url: &str) -> Option<Document> {
-    let re = regex::Regex::new(r"(?x)(?P<prefix>[did]{3}):(?P<method>[a-z]*):").unwrap();
+    let re = regex::Regex::new(r"(?x)(?P<prefix>did):(?P<method>[a-z]+?){1}:(?P<id>[a-zA-Z0-9-_]*)(?P<kerlid>\?kerl=)?(?P<kerl>[a-zA-Z0-9]*)").unwrap();
     match re.captures(did_url) {
         Some(caps) => {
-            let resolver = match &caps["method"] {
+            let resolver: Box<dyn DdoResolver> = match &caps["method"] {
                 #[cfg(feature = "didkey")]
-                "key" => DidKeyResolver{},
+                "key" => Box::new(DidKeyResolver{}),
+                #[cfg(feature = "keriox")]
+                "keri" => Box::new(DidKeriResolver::new(&String::from_utf8_lossy(&base64_url::decode(&caps["kerl"])
+                            .unwrap_or(vec!())))),
                 #[cfg(feature = "didjolo")]
                 "jolo" => {},
                 #[cfg(feature = "didweb")]
                 "web" => {},
                 _ => return None
             };
-            match resolver.resolve(did_url) {
+            let parsed_url = format!("{}:{}:{}", &caps["prefix"], &caps["method"], &caps["id"]);
+            match resolver.resolve(&parsed_url) {
                 Ok(doc) => Some(doc),
                 Err(_) => None
             }
@@ -173,7 +190,7 @@ pub(crate) fn get_public_key(doc: &Document, curve: &str) -> Option<KeyFormat> {
 // Helper function to get key id from did url
 // # + id
 pub(crate) fn key_id_from_didurl(url: &str) -> String {
-    let re = regex::Regex::new(r"(?x)(?P<prefix>[did]{3}):(?P<method>[a-z]*):(?P<key_id>[a-zA-Z0-9]*)([:?/]?)(\S)*$").unwrap();
+    let re = regex::Regex::new(r"(?x)(?P<prefix>[did]{3}):(?P<method>[a-z]*):(?P<key_id>[a-zA-Z0-9]*)([:?/]?)(\S)*\??").unwrap();
     match  re.captures(url) {
         Some(s) =>
             match s.name("key_id") {
