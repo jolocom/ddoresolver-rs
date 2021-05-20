@@ -132,12 +132,11 @@ mod did_keri_tests {
 
     #[test]
     fn resolve_any_keri_test() {
-        let kerl_str = r#"{"v":"KERI10JSON000115_","i":"Eh9Gq4--Q1OVxJEL7M49-a5k7iEJATqSAxQiRLwJEja4","s":"0","t":"icp","kt":"1","k":["D7sD1K7bTfG4E8ObJa4Ecd6zuML1diINCvKXy_o1FK60","CFyJrFXQYvDYiK0c7CLIisfq6xO-D0gqjW0ThtVKObHs"],"n":"E1IzcG1u6Iy5onwrCG1AKcj9KUJ-0rbMq_t6yViIgv2U","wt":"0","w":[],"c":[]}-AABAAlccRMa44Jo07A_fuOwDP6Fu9_3PArGIKYCo7F9U8OC_02d5p26LuenliVDkmp7DV9hyYUHeWIug6PsIZlUlKAg"#;
-        let full_kerl_with_url = format!("did:keri:Eh9Gq4--Q1OVxJEL7M49-a5k7iEJATqSAxQiRLwJEja4?kerl={}", encode(kerl_str));
+        let kerl_str = r#"{"v":"KERI10JSON000115_","i":"E6hwQjTM81XBKO05JxpjO11e3SY-jJfs2vatUr3nVdy4","s":"0","t":"icp","kt":"1","k":["DG9Q4wQ87Q5VKv6HJ6b22hY2famnwBibEMQr7-d7sn5c","CIOa96x9rTFbbMkcgbd3yMErXTJMqPMWhH11gZq1vNHc"],"n":"EHZM6aLLfh_dW0YgInXCBHESUNNlZkzgfurKPzyKHnIE","wt":"0","w":[],"c":[]}-AABAARkUt2sJQ743MUhWLH4ggqbklE-2gbE4gd07vjfgWmR6FT-5hcVODhmydbyBfzzLyuMM6CicAN9ZIFNFEyfAbBQ"#;
+        let full_kerl_with_url = format!("did:keri:E6hwQjTM81XBKO05JxpjO11e3SY-jJfs2vatUr3nVdy4?kerl={}", encode(kerl_str));
         let res = resolve_any(&full_kerl_with_url);
         assert!(res.is_some());
         let doc = res.unwrap();
-        println!("{:?}", &doc);
         let key = doc.find_public_key_for_curve("X25519");
         assert!(key.is_some());
     }

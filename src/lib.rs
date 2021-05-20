@@ -4,6 +4,9 @@ pub mod error;
 pub mod keri;
 #[cfg(feature = "didkey")]
 pub mod key;
+#[cfg(feature = "jolo")]
+pub mod jolo;
+
 #[cfg(feature = "didkey")]
 use key::DidKeyResolver;
 #[cfg(feature = "keriox")]
