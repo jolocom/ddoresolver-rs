@@ -39,18 +39,20 @@ impl DdoResolver for DidKeriResolver {
                 .public_keys
                 .iter()
                 .map(|prefix| VerificationMethod {
-                    id: key_id_from_didurl(did_url),
-                    key_type: as_string(&prefix.derivation),
-                    controller: did_url.into(),
-                    public_key: Some(KeyFormat::Multibase(prefix.derivative().to_vec())),
-                    private_key: None
-                })
+                        id: key_id_from_didurl(did_url),
+                        key_type: as_string(&prefix.derivation),
+                        controller: did_url.into(),
+                        public_key: Some(KeyFormat::Multibase(prefix.derivative().to_vec())),
+                        private_key: None
+                    })
                 .collect::<Vec<VerificationMethod>>(),
             assertion_method: None,
             authentication: None,
             capability_delegation: None,
             capability_invocation: None,
-            key_agreement: None
+            // FIXME: populate this with references of X* key refs
+            // https://www.w3.org/TR/did-core/#dfn-keyagreement
+            key_agreement: None,
         })
    }
 }

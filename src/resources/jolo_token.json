@@ -1,0 +1,39 @@
+[
+    {
+        "type": "function",
+        "name": "getRecord",
+        "constant": true,
+        "inputs": [
+            {
+                "name": "",
+                "type": "string"
+            }
+        ],
+        "outputs": [
+            {
+                "name": "",
+                "type": "string"
+            }
+        ]
+    },
+    {
+        "type": "function",
+        "name": "setRecord",
+        "constant": false,
+        "inputs": [
+            {
+                "name": "did",
+                "type": "bytes32"
+            },
+            {
+                "name": "_newHash",
+                "type": "string"
+            }
+        ],
+        "outputs": []
+    },
+    {
+        "type": "constructor",
+        "inputs": ""
+    }
+]
