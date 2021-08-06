@@ -1,7 +1,8 @@
 use std::fs;
+use ipfs_api::IpfsClient;
 use serde::Deserialize;
-use web3::{Web3, contract::{Contract, Options}, ethabi::Token, transports::Http, types::Address};
-use crate::Error;
+use web3::{Web3, contract::{Contract, Options}, ethabi::Token, futures::StreamExt, transports::Http, types::Address};
+use crate::{DdoResolver, Error};
 
 pub const RINKEBY: &'static str = "./config/jolo_rinkeby.json";
 pub const MAINNET: &'static str = "./config/jolo.json";
@@ -14,24 +15,31 @@ struct JoloConfig {
 }
 
 pub struct JoloResolver {
-    contract: Contract<Http>
+    contract: Contract<Http>,
+    client: IpfsClient
 }
 
 impl JoloResolver {
-    pub fn new(provider_address: &str, contract_address: &str) -> Result<Self, Error> {
+    pub fn new(provider_address: &str, contract_address: &str, ipfs_endpoint: &str) -> Result<Self, Error> {
         let http = Http::new(provider_address)?;
         let w3 = Web3::new(http);
         let c_address = Address::from_slice(&hex::decode(contract_address)?);
+        let ipfs_client: IpfsClient = ipfs_api::TryFromUri::from_str(ipfs_endpoint)
+            .map_err(|e| Error::UriParseError(e.to_string()))?;
         Ok(Self {
             contract: Contract::from_json(
                 w3.eth(),
                 c_address,
                 include_bytes!("./resources/jolo_token.json")
-            )?
+            )?,
+            client: ipfs_client
         })
     }
 
     pub async fn resolve_record(&self, did_url: String) -> Result<String, Error> {
+        if !did_url.starts_with("did::jolo") && did_url.len() != 73 {
+            return Err(Error::NotDidJolo);
+        }
         let url_token = Token::FixedBytes(hex::decode(did_url.trim_start_matches("did:jolo:"))?);
         let response: String = self.contract.query(
             "getRecord",
@@ -45,6 +53,25 @@ impl JoloResolver {
         } else {
             Ok(response)
         }
+    }
+
+    pub async fn get_ipfs_record(&self, hash: &str) -> Result<String, Error> {
+        // let full_path = format!("{}", hash);
+        let (ddo, _) = self.client.get(hash).into_future().await;
+        match ddo {
+            Some(Ok(bytes)) => Ok(String::from_utf8(bytes.as_ref().to_vec())?),
+            Some(Err(e)) => Err(Error::IpfsResponseError(e.to_string())),
+            _ => Err(Error::DidResolutionFailed)
+        }
+    }
+}
+
+impl DdoResolver for JoloResolver {
+    fn resolve(&self, did_url: &str) -> Result<did_key::Document, Error> {
+        let rt = tokio::runtime::Runtime::new()?;
+        let hash = rt.block_on(self.resolve_record(did_url.into()))?; 
+        let ddo_from_ipfs = rt.block_on(self.get_ipfs_record(&hash))?;
+        Ok(serde_json::from_str(&ddo_from_ipfs)?)
     }
 }
 
@@ -76,9 +103,28 @@ async fn rinkeby_resolve() {
     let test_user_did = "did:jolo:f334484858571199b681f6dfdd9ecd2f01df5b38f8379b3aaa89436c61fd1955";
     let resolver = JoloResolver::new(
         &config.provider_url,
-        &config.contract_address
+        &config.contract_address,
+        &config.ipfs_endpoint
     );
     assert!(resolver.is_ok());
     let response = resolver.unwrap().resolve_record(test_user_did.into()).await;
     assert!(response.is_ok());
+}
+
+#[cfg(test)]
+#[tokio::test]
+async fn ipfs_resolve() {
+    let ddo_hash = "0298a5f231fc9224ca466bdbd0b27cb34d27939d0e8aa4b65ba4ef1ed805f14975";
+    let config = read_config(RINKEBY).unwrap();
+    let resolver = JoloResolver::new(
+        &config.provider_url,
+        &config.contract_address,
+        &config.ipfs_endpoint
+    );
+    assert!(resolver.is_ok());
+    let ddo = resolver.unwrap().get_ipfs_record(ddo_hash).await;
+    if ddo.is_err() {
+        println!("{:?}", ddo);
+    }
+    assert!(ddo.is_ok());
 }
