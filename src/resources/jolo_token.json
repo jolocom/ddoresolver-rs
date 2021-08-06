@@ -1,24 +1,24 @@
 [
     {
-        "type": "function",
-        "name": "getRecord",
         "constant": true,
         "inputs": [
             {
-                "name": "",
-                "type": "string"
+                "name":"_did",
+                "type":"bytes32"
             }
         ],
+        "name": "getRecord",
         "outputs": [
             {
-                "name": "",
-                "type": "string"
+                "name":"",
+                "type":"string"
             }
-        ]
+        ],
+        "payable": false,
+        "stateMutability": "view",
+        "type": "function"
     },
     {
-        "type": "function",
-        "name": "setRecord",
         "constant": false,
         "inputs": [
             {
@@ -30,10 +30,34 @@
                 "type": "string"
             }
         ],
-        "outputs": []
+        "name": "setRecord",
+        "outputs": [],
+        "payable": false,
+        "stateMutability": "nonpayable",
+        "type": "function"
     },
     {
-        "type": "constructor",
-        "inputs": ""
+        "inputs": [],
+        "payable": false,
+        "stateMutability": "nonpayable",
+        "type": "constructor"
+    },
+    {
+        "anonymous": false,
+        "inputs": [],
+        "name": "registrationFailure",
+        "type": "event"
+    },
+    {
+        "anonymous": false,
+        "inputs": [
+            {
+                "indexed": false,
+                "name": "_ddoHash",
+                "type": "string"
+            }
+        ],
+        "name": "registrationSuccess",
+        "type": "event"
     }
 ]

@@ -25,4 +25,7 @@ pub enum Error {
     #[cfg(feature = "jolo")]
     #[error(transparent)]
     W3ContractError(#[from] web3::contract::Error),
+    #[cfg(feature = "jolo")]
+    #[error(transparent)]
+    FromHexError(#[from] hex::FromHexError),
 }
