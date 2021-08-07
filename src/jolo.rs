@@ -78,8 +78,8 @@ impl JoloResolver {
     }
 
     pub async fn get_ipfs_record(&self, hash: &str) -> Result<String, Error> {
-        // let full_path = format!("{}", hash);
-        let (ddo, _) = self.client.get(hash).into_future().await;
+        let full_path = format!("api/v0/cat/{}", hash);
+        let (ddo, _) = self.client.get(&full_path).into_future().await;
         match ddo {
             Some(Ok(bytes)) => Ok(String::from_utf8(bytes.as_ref().to_vec())?),
             Some(Err(e)) => Err(Error::IpfsResponseError(e.to_string())),
