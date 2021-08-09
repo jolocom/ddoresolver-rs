@@ -21,18 +21,33 @@ pub const RINKEBY: &'static str = "./config/jolo_rinkeby.json";
 pub const MAINNET: &'static str = "./config/jolo.json";
 
 #[derive(Debug, Deserialize)]
-struct JoloConfig {
+pub struct JoloConfig {
     contract_address: String,
     provider_url: String,
     ipfs_endpoint: String,
 }
 
+/// Instance of actual resolver
+/// Implements `DdoResolver` trait for synchronous resolution
+///  and `async_resolve()` method for asynchronous resolution
+/// Can (and should) be used for cached/once instantiated 
+///  resolver for smoother performance.
+/// Available ONLY with `jolo` feature
+///
 pub struct JoloResolver {
     contract: Contract<Http>,
     client: IpfsClient
 }
 
 impl JoloResolver {
+    /// Generic constructor, which takes all required inputs separately
+    /// #Parameters
+    /// `provider_address` - endpoint for Ethereum network communications.
+    ///     URL for HTTP transport should be provided;
+    /// `contract_address` - Jolo resolver Ethereum contract address;
+    /// `ipfs_endpoint` - entry point for IPFS resolution.
+    ///     base URL only! ### Example: https://ipfs.jolocom.com:443
+    ///
     pub fn new(provider_address: &str, contract_address: &str, ipfs_endpoint: &str) -> Result<Self, Error> {
         let http = Http::new(provider_address)?;
         let w3 = Web3::new(http);
@@ -49,6 +64,10 @@ impl JoloResolver {
         })
     }
 
+    /// Constructor, which takes path to a JSON config file 
+    ///  which contains `JoloConfig` information and uses it
+    ///  with generic constructor.
+    ///
     pub fn new_from_cfg(path: &str) -> Result<Self, Error> {
         let config = read_config(path)?;
         Self::new(
@@ -58,8 +77,14 @@ impl JoloResolver {
         )
     }
 
+    /// Resolver Ethereum record from jolocom contract
+    /// #Parameters
+    /// `did_url` - is DID url of identifier,
+    ///  must start with "did:jolo:"
+    ///  otherwise returns error: `Error::NotDidJolo`
+    ///
     pub async fn resolve_record(&self, did_url: String) -> Result<String, Error> {
-        if !did_url.starts_with("did::jolo") && did_url.len() != 73 {
+        if !did_url.starts_with("did::jolo:") && did_url.len() != 73 {
             return Err(Error::NotDidJolo);
         }
         let url_token = Token::FixedBytes(hex::decode(did_url.trim_start_matches("did:jolo:"))?);
@@ -77,6 +102,10 @@ impl JoloResolver {
         }
     }
 
+    /// Resolves DID document as an object string from IPFS
+    /// #Parameters
+    /// `hash` - hash returned by `resolve_record()` method;
+    ///
     pub async fn get_ipfs_record(&self, hash: &str) -> Result<String, Error> {
         let full_path = format!("api/v0/cat/{}", hash);
         let (ddo, _) = self.client.get(&full_path).into_future().await;
@@ -87,6 +116,13 @@ impl JoloResolver {
         }
     }
 
+    /// Full async resolver.
+    /// Does the same as `DdoResolver::resolve()` but asynchronously
+    /// #Parameters
+    /// `did_url` - is DID url of identifier,
+    ///  must start with "did:jolo:"
+    ///  otherwise returns error: `Error::NotDidJolo`
+    ///
     pub async fn resolve_async(&self, did_url: &str) -> Result<did_key::Document, Error> {
         Ok(serde_json::from_str(
             &self.get_ipfs_record(
