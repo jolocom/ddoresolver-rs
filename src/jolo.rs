@@ -86,6 +86,14 @@ impl JoloResolver {
             _ => Err(Error::DidResolutionFailed)
         }
     }
+
+    pub async fn resolve_async(&self, did_url: &str) -> Result<did_key::Document, Error> {
+        Ok(serde_json::from_str(
+            &self.get_ipfs_record(
+                &self.resolve_record(did_url.into()).await?
+            ).await?
+        )?)
+    }
 }
 
 impl DdoResolver for JoloResolver {
