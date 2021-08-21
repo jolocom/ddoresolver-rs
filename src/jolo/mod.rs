@@ -130,6 +130,10 @@ impl JoloResolver {
             ).await?
         )?)
     }
+
+    pub async fn register(&self, ) -> Result<(), Error> {
+
+    }
 }
 
 impl DdoResolver for JoloResolver {
