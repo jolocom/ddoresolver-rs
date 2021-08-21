@@ -1,17 +1,11 @@
 use std::fs;
+use did_key::Document;
 use ipfs_api::IpfsClient;
 use serde::Deserialize;
-use web3::{
-    Web3,
-    contract::{
+use web3::{Web3, contract::{
         Contract,
         Options
-    },
-    ethabi::Token,
-    futures::StreamExt,
-    transports::Http,
-    types::Address
-};
+    }, ethabi::Token, futures::StreamExt, transports::Http, types::{Address, H160, H256, U256}};
 use crate::{
     DdoResolver,
     Error,
@@ -58,7 +52,7 @@ impl JoloResolver {
             contract: Contract::from_json(
                 w3.eth(),
                 c_address,
-                include_bytes!("./resources/jolo_token.json")
+                include_bytes!("../resources/jolo_token.json")
             )?,
             client: ipfs_client
         })
@@ -116,6 +110,10 @@ impl JoloResolver {
         }
     }
 
+    async fn store_ipfs_record(&self, document: &str) -> Result<String, Error> {
+        todo!()
+    }
+
     /// Full async resolver.
     /// Does the same as `DdoResolver::resolve()` but asynchronously
     /// #Parameters
@@ -131,8 +129,29 @@ impl JoloResolver {
         )?)
     }
 
-    pub async fn register(&self, ) -> Result<(), Error> {
-
+    pub async fn register(&self, document: &Document, account: &[u8]) -> Result<(), Error> {
+        if account.len() != 20 {
+            return Err(Error::NotEthAddress);
+        }
+        // address of the caller
+        let from = H160::from_slice(account);
+        let serialized = serde_json::to_string(&document)?;
+        let hash = Token::String(self.store_ipfs_record(&serialized).await?);
+        let token = Token::FixedBytes(hex::decode(&document.id)?);
+        // Set gas limit and gas price for transaction
+        let options = Options {
+            gas: Some(U256::from_str_radix("0x493e0", 16).unwrap()),
+            ..Options::default()
+        };
+        match self.contract.call(
+        "setRecord",
+        (token, hash,),
+        from,
+        options
+        ).await {
+            Ok(_) => Ok(()),
+            Err(e) => Err(Error::W3ContractError(e))
+        }
     }
 }
 
@@ -201,4 +220,13 @@ fn jolo_doc_resolver() {
     use crate::DdoParser;
     let key = doc.find_public_key_for_curve("ED");
     assert!(key.is_some());
+}
+
+#[test]
+fn gas_conversion_test() {
+    // panics if not succeeded
+    let price = U256::from_str_radix("0x4e3b29200", 16).unwrap();
+    // panics if not succeeded
+    let limit = U256::from_str_radix("0x493e0", 16).unwrap();
+    println!("price: {}, limit: {}", price, limit);
 }

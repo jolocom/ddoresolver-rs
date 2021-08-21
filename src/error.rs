@@ -28,6 +28,10 @@ pub enum Error {
     IoError(#[from] std::io::Error),
 
     #[cfg(feature = "jolo")]
+    #[error("Not ETH address. Length must be 20 bytes")]
+    NotEthAddress,
+
+    #[cfg(feature = "jolo")]
     #[error(transparent)]
     W3Error(#[from] web3::Error),
 
