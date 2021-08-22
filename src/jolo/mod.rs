@@ -1,11 +1,14 @@
-use std::fs;
-use did_key::Document;
+use std::{fs, io::Cursor};
 use ipfs_api::IpfsClient;
 use serde::Deserialize;
 use web3::{Web3, contract::{
         Contract,
         Options
-    }, ethabi::Token, futures::StreamExt, transports::Http, types::{Address, H160, H256, U256}};
+    }, ethabi::Token, futures::StreamExt, transports::Http, types::Address};
+#[cfg(feature = "registrar")]
+use web3::types::{U256, H160};
+#[cfg(feature = "registrar")]
+use did_key::Document;
 use crate::{
     DdoResolver,
     Error,
@@ -110,14 +113,18 @@ impl JoloResolver {
         }
     }
 
-    async fn store_ipfs_record(&self, document: &str) -> Result<String, Error> {
-        todo!()
+    async fn store_ipfs_record(&self, document: String) -> Result<String, Error> {
+        let cursor = Cursor::new(document);
+        match self.client.add(cursor).await {
+            Ok(res) => Ok(res.hash),
+            Err(e) => Err(Error::IpfsResponseError(e.to_string()))
+        }
     }
 
     /// Full async resolver.
     /// Does the same as `DdoResolver::resolve()` but asynchronously
     /// #Parameters
-    /// `did_url` - is DID url of identifier,
+    /// * `did_url` - is DID url of identifier,
     ///  must start with "did:jolo:"
     ///  otherwise returns error: `Error::NotDidJolo`
     ///
@@ -129,14 +136,22 @@ impl JoloResolver {
         )?)
     }
 
-    pub async fn register(&self, document: &Document, account: &[u8]) -> Result<(), Error> {
+    /// Full async registrar.
+    /// Available with `registrar` feature only.
+    /// # Parameters
+    /// * `document` - DID Document to be anchored
+    /// * `account` - Ethereum account as raw bytes slice.
+    /// panics if `account` is incorrect length
+    ///
+    #[cfg(feature = "registrar")]
+    pub async fn register_async(&self, document: &Document, account: &[u8]) -> Result<(), Error> {
         if account.len() != 20 {
             return Err(Error::NotEthAddress);
         }
         // address of the caller
         let from = H160::from_slice(account);
         let serialized = serde_json::to_string(&document)?;
-        let hash = Token::String(self.store_ipfs_record(&serialized).await?);
+        let hash = Token::String(self.store_ipfs_record(serialized).await?);
         let token = Token::FixedBytes(hex::decode(&document.id)?);
         // Set gas limit and gas price for transaction
         let options = Options {
@@ -222,11 +237,30 @@ fn jolo_doc_resolver() {
     assert!(key.is_some());
 }
 
-#[test]
-fn gas_conversion_test() {
-    // panics if not succeeded
-    let price = U256::from_str_radix("0x4e3b29200", 16).unwrap();
-    // panics if not succeeded
-    let limit = U256::from_str_radix("0x493e0", 16).unwrap();
-    println!("price: {}, limit: {}", price, limit);
+// Registrar tests
+#[cfg(feature = "registrar")]
+#[cfg(test)]
+mod registrar_tests {
+    use super::JoloResolver;
+
+    #[test]
+    fn gas_conversion_test() {
+        // panics if not succeeded
+        let price = crate::jolo::U256::from_str_radix("0x4e3b29200", 16).unwrap();
+        // panics if not succeeded
+        let limit = crate::jolo:: U256::from_str_radix("0x493e0", 16).unwrap();
+        println!("price: {}, limit: {}", price, limit);
+    }
+
+    #[tokio::test]
+    async fn registration_and_resolution_test() {
+        let resolver = JoloResolver::new_from_cfg(super::RINKEBY).unwrap();
+        let doc = did_key::Document {
+
+        };
+        let result = resolver.register_async(&doc, account).await;
+        assert!(result.is_ok());
+        let resolve_result = resolver.resolve_async(&format!("did:jolo:{}", doc.id)).await;
+        assert!(result.is_ok());
+    }
 }
