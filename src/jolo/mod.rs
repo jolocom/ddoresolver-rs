@@ -241,6 +241,8 @@ fn jolo_doc_resolver() {
 #[cfg(feature = "registrar")]
 #[cfg(test)]
 mod registrar_tests {
+    use did_key::VerificationMethod;
+
     use super::JoloResolver;
 
     #[test]
@@ -256,11 +258,18 @@ mod registrar_tests {
     async fn registration_and_resolution_test() {
         let resolver = JoloResolver::new_from_cfg(super::RINKEBY).unwrap();
         let doc = did_key::Document {
-
+            context : "https://www.w3.org/ns/did/v1".into(),
+            id: "zAKJP3f7BD6W4iWEQ9jwndVTCBq8ua2Utt8EEjJ6Vxsf".into(),
+            assertion_method: None,
+            authentication: None,
+            capability_delegation: None,
+            capability_invocation: None,
+            key_agreement: None,
+            verification_method: vec!(VerificationMethod::default())
         };
-        let result = resolver.register_async(&doc, account).await;
+        let result = resolver.register_async(&doc, &hex::decode("D4351c3f383d79bA378ed1875275b1E7b960f120").unwrap()).await;
         assert!(result.is_ok());
         let resolve_result = resolver.resolve_async(&format!("did:jolo:{}", doc.id)).await;
-        assert!(result.is_ok());
+        assert!(resolve_result.is_ok());
     }
 }
