@@ -33,10 +33,11 @@ pub struct JoloConfig {
 ///
 pub struct JoloResolver {
     contract: Contract<Http>,
+    w3: Web3<Http>,
     client: IpfsClient
 }
 
-impl JoloResolver {
+impl JoloResolver{
     /// Generic constructor, which takes all required inputs separately
     /// #Parameters
     /// `provider_address` - endpoint for Ethereum network communications.
@@ -57,6 +58,7 @@ impl JoloResolver {
                 c_address,
                 include_bytes!("../resources/jolo_token.json")
             )?,
+            w3,
             client: ipfs_client
         })
     }
@@ -152,10 +154,16 @@ impl JoloResolver {
         let from = H160::from_slice(account);
         let serialized = serde_json::to_string(&document)?;
         let hash = Token::String(self.store_ipfs_record(serialized).await?);
-        let token = Token::FixedBytes(hex::decode(&document.id)?);
+        // let _d_hash = &hash.clone().into_string().unwrap().from_base58().unwrap();
+        // let decoded = base64_url::decode(&document.id)?;
+        let hex = hex::decode(&document.id)?;
+        let token = Token::FixedBytes(hex);
         // Set gas limit and gas price for transaction
         let options = Options {
             gas: Some(U256::from_str_radix("0x493e0", 16).unwrap()),
+            gas_price: Some(U256::from_str_radix("0x4e3b29200", 16).unwrap()),
+            nonce: Some(self.w3.eth().transaction_count(from, None).await?),
+            value: Some(U256::from_str_radix("0x00", 16).unwrap()),
             ..Options::default()
         };
         match self.contract.call(
@@ -242,7 +250,6 @@ fn jolo_doc_resolver() {
 #[cfg(test)]
 mod registrar_tests {
     use did_key::VerificationMethod;
-
     use super::JoloResolver;
 
     #[test]
@@ -254,12 +261,17 @@ mod registrar_tests {
         println!("price: {}, limit: {}", price, limit);
     }
 
+    #[test]
+    fn hex_to_fiked_bytes_test() {
+        
+    }
+
     #[tokio::test]
     async fn registration_and_resolution_test() {
         let resolver = JoloResolver::new_from_cfg(super::RINKEBY).unwrap();
         let doc = did_key::Document {
             context : "https://www.w3.org/ns/did/v1".into(),
-            id: "zAKJP3f7BD6W4iWEQ9jwndVTCBq8ua2Utt8EEjJ6Vxsf".into(),
+            id: "f334484858571199b681f6dfdd9ecd2f01df5b38f8379b3aaa89436c61fd1955".into(),
             assertion_method: None,
             authentication: None,
             capability_delegation: None,
@@ -268,6 +280,7 @@ mod registrar_tests {
             verification_method: vec!(VerificationMethod::default())
         };
         let result = resolver.register_async(&doc, &hex::decode("D4351c3f383d79bA378ed1875275b1E7b960f120").unwrap()).await;
+        if result.is_err() { println!("{:?}", result); }
         assert!(result.is_ok());
         let resolve_result = resolver.resolve_async(&format!("did:jolo:{}", doc.id)).await;
         assert!(resolve_result.is_ok());
