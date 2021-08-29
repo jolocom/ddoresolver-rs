@@ -140,6 +140,7 @@ impl JoloResolver{
 
     /// Full async registrar.
     /// Available with `registrar` feature only.
+    /// #WARNING: works on mainnet only! (no pre-signing is supported)
     /// # Parameters
     /// * `document` - DID Document to be anchored
     /// * `account` - Ethereum account as raw bytes slice.
@@ -259,11 +260,6 @@ mod registrar_tests {
         // panics if not succeeded
         let limit = crate::jolo:: U256::from_str_radix("0x493e0", 16).unwrap();
         println!("price: {}, limit: {}", price, limit);
-    }
-
-    #[test]
-    fn hex_to_fiked_bytes_test() {
-        
     }
 
     #[tokio::test]
