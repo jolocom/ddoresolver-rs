@@ -279,7 +279,10 @@ mod registrar_tests {
             key_agreement: None,
             verification_method: vec!(VerificationMethod::default())
         };
-        let result = resolver.register_async(&doc, &hex::decode("D4351c3f383d79bA378ed1875275b1E7b960f120").unwrap()).await;
+        let result = resolver.register_async(
+            &doc, 
+            &hex::decode("c4b48901af7891d83ce83877e1f8fb4c81a94907").unwrap()
+            ).await;
         if result.is_err() { println!("{:?}", result); }
         assert!(result.is_ok());
         let resolve_result = resolver.resolve_async(&format!("did:jolo:{}", doc.id)).await;

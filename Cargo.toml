@@ -13,7 +13,7 @@ edition = "2018"
 
 [dependencies]
 thiserror = "1.0"
-did-key = { path = "../../did-key.rs", version = "0.0.13", optional = true }
+did-key = { version = "0.0.13", optional = true }
 keri = { version = "0.6", optional = true }
 ipfs-api = { version = "0.11.0", features = ["with-hyper"], optional = true }
 web3 = { version = "0.17.0", default-features = false, features = ["http-rustls-tls", "http", "http-tls"], optional = true }
@@ -30,7 +30,7 @@ tokio = { version = "1.9", features = ["macros", "rt-multi-thread"], optional = 
 x25519-dalek = "1.1.0"
 
 [features]
-default = ["didkey", "keriox", "jolo", "registrar"]
+default = ["didkey", "keriox", "jolo"]
 all = ["didkey", "keriox"]
 didkey = ["did-key"]
 keriox = ["keri"]
