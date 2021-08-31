@@ -1,10 +1,12 @@
-use std::{fs, io::Cursor};
+use std::fs;
 use ipfs_api::IpfsClient;
 use serde::Deserialize;
 use web3::{Web3, contract::{
         Contract,
         Options
     }, ethabi::Token, futures::StreamExt, transports::Http, types::Address};
+#[cfg(feature = "registrar")]
+use std::io::Cursor;
 #[cfg(feature = "registrar")]
 use web3::types::{U256, H160};
 #[cfg(feature = "registrar")]
@@ -33,7 +35,7 @@ pub struct JoloConfig {
 ///
 pub struct JoloResolver {
     contract: Contract<Http>,
-    w3: Web3<Http>,
+    _w3: Web3<Http>,
     client: IpfsClient
 }
 
@@ -48,17 +50,17 @@ impl JoloResolver{
     ///
     pub fn new(provider_address: &str, contract_address: &str, ipfs_endpoint: &str) -> Result<Self, Error> {
         let http = Http::new(provider_address)?;
-        let w3 = Web3::new(http);
+        let _w3 = Web3::new(http);
         let c_address = Address::from_slice(&hex::decode(contract_address)?);
         let ipfs_client: IpfsClient = ipfs_api::TryFromUri::from_str(ipfs_endpoint)
             .map_err(|e| Error::UriParseError(e.to_string()))?;
         Ok(Self {
             contract: Contract::from_json(
-                w3.eth(),
+                _w3.eth(),
                 c_address,
                 include_bytes!("../resources/jolo_token.json")
             )?,
-            w3,
+            _w3,
             client: ipfs_client
         })
     }
@@ -115,6 +117,7 @@ impl JoloResolver{
         }
     }
 
+    #[cfg(feature = "registrar")]
     async fn store_ipfs_record(&self, document: String) -> Result<String, Error> {
         let cursor = Cursor::new(document);
         match self.client.add(cursor).await {
@@ -163,7 +166,7 @@ impl JoloResolver{
         let options = Options {
             gas: Some(U256::from_str_radix("0x493e0", 16).unwrap()),
             gas_price: Some(U256::from_str_radix("0x4e3b29200", 16).unwrap()),
-            nonce: Some(self.w3.eth().transaction_count(from, None).await?),
+            nonce: Some(self._w3.eth().transaction_count(from, None).await?),
             value: Some(U256::from_str_radix("0x00", 16).unwrap()),
             ..Options::default()
         };

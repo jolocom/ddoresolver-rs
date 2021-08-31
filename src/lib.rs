@@ -106,7 +106,7 @@ impl DdoParser for Document {
 /// Output is `Document` or `Error`.
 ///
 pub fn try_resolve_any(did_url: &str) -> Result<Document, Error> {
-    let re = regex::Regex::new(r"(?x)(?P<prefix>did):(?P<method>[a-z]*){1}:(?P<id>.*)(?P<kerlid>?kerl=)(?P<kerl>[a-zA-Z0-9]*)").unwrap();
+    let re = regex::Regex::new(r"^((?P<prefix>did){1}:(?P<method>[a-z]*){1}:(?P<id>.+?))((?P<kerlid>\?kerl=)(?P<kerl>[a-zA-Z0-9]+?))?$").unwrap();
     match re.captures(did_url) {
         Some(caps) => {
             match &caps["method"] {
@@ -139,15 +139,20 @@ pub fn try_resolve_any(did_url: &str) -> Result<Document, Error> {
 /// Output is Option: `Some(Document)` or `None`. Will never fail with error.
 ///
 pub fn resolve_any(did_url: &str) -> Option<Document> {
-    let re = regex::Regex::new(r"(?x)(?P<prefix>did):(?P<method>[a-z]+?){1}:(?P<id>[a-zA-Z0-9-_]*)(?P<kerlid>?kerl=)?(?P<kerl>[a-zA-Z0-9]*)").unwrap();
+    let re = regex::Regex::new(r"^((?P<prefix>did){1}:(?P<method>[a-z]*){1}:(?P<id>.+?))((?P<kerlid>\?kerl=)(?P<kerl>[a-zA-Z0-9]+?))?$").unwrap();
     match re.captures(did_url) {
         Some(caps) => {
             let resolver: Box<dyn DdoResolver> = match &caps["method"] {
                 #[cfg(feature = "didkey")]
                 "key" => Box::new(DidKeyResolver{}),
                 #[cfg(feature = "keriox")]
-                "keri" => Box::new(DidKeriResolver::new(&String::from_utf8_lossy(&base64_url::decode(&caps["kerl"])
-                            .unwrap_or(vec!())))),
+                "keri" => {
+                    println!("kerl should be here: {}", &caps["kerl"]);
+                    Box::new(
+                    DidKeriResolver::new(
+                        &String::from_utf8_lossy(&base64_url::decode(&caps["kerl"])
+                            .unwrap_or(vec!()))))
+                },
                 #[cfg(feature = "didjolo")]
                 "jolo" => {},
                 #[cfg(feature = "didweb")]
@@ -217,4 +222,3 @@ pub struct KeyAgreement {
     #[serde(rename = "publicKeyBase58")]
     pub public_key_base58: String,
 }
-

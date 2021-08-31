@@ -1,6 +1,6 @@
 [package]
 name = "ddoresolver-rs"
-version = "0.3.0"
+version = "0.3.1"
 documentation = "https://docs.rs/ddoresolver-rs"
 description = "function to resolve did document from url"
 license = "Apache-2.0"
@@ -30,7 +30,7 @@ tokio = { version = "1.9", features = ["macros", "rt-multi-thread"], optional = 
 x25519-dalek = "1.1.0"
 
 [features]
-default = ["didkey", "keriox", "jolo"]
+default = ["didkey", "keriox"]
 all = ["didkey", "keriox"]
 didkey = ["did-key"]
 keriox = ["keri"]
