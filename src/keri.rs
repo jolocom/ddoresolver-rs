@@ -1,50 +1,41 @@
 use keri::{
     derivation::basic::Basic,
+    event_message::parse::{signed_event_stream, Deserialized},
     prefix::Prefix,
     state::IdentifierState,
-    event_message::parse::{
-        Deserialized,
-        signed_event_stream,
-    },
 };
 
-use crate::{
-    DdoResolver,
-    Document,
-    KeyFormat,
-    VerificationMethod,
-    Error,
-    key_id_from_didurl,
-};
+use crate::{key_id_from_didurl, DdoResolver, Document, Error, KeyFormat, VerificationMethod};
 
 pub struct DidKeriResolver {
-    state: IdentifierState
+    state: IdentifierState,
 }
 
 impl DidKeriResolver {
     pub fn new(state: &str) -> Self {
         DidKeriResolver {
-            state: mem_parse(state)
+            state: mem_parse(state),
         }
     }
 }
 
 impl DdoResolver for DidKeriResolver {
-   fn resolve(&self, did_url: &str) -> Result<Document, Error> {
+    fn resolve(&self, did_url: &str) -> Result<Document, Error> {
         Ok(Document {
             context: "https://www.w3.org/ns/did/v1".into(),
             id: did_url.into(),
-            verification_method: self.state
+            verification_method: self
+                .state
                 .current
                 .public_keys
                 .iter()
                 .map(|prefix| VerificationMethod {
-                        id: key_id_from_didurl(did_url),
-                        key_type: as_string(&prefix.derivation),
-                        controller: did_url.into(),
-                        public_key: Some(KeyFormat::Multibase(prefix.derivative().to_vec())),
-                        private_key: None
-                    })
+                    id: key_id_from_didurl(did_url),
+                    key_type: as_string(&prefix.derivation),
+                    controller: did_url.into(),
+                    public_key: Some(KeyFormat::Multibase(prefix.derivative().to_vec())),
+                    private_key: None,
+                })
                 .collect::<Vec<VerificationMethod>>(),
             assertion_method: None,
             authentication: None,
@@ -54,16 +45,18 @@ impl DdoResolver for DidKeriResolver {
             // https://www.w3.org/TR/did-core/#dfn-keyagreement
             key_agreement: None,
         })
-   }
+    }
 }
 
 // Helper method to get string representation of keri key type
 fn as_string(b: &Basic) -> String {
     match b {
         Basic::Ed25519NT | Basic::Ed25519 => "Ed25519VerificationKey2018".into(),
-        Basic::ECDSAsecp256k1 | Basic::ECDSAsecp256k1NT => "EcdsaSecp256k1VerificationKey2019".into(),
+        Basic::ECDSAsecp256k1 | Basic::ECDSAsecp256k1NT => {
+            "EcdsaSecp256k1VerificationKey2019".into()
+        }
         Basic::X25519 => "X25519KeyAgreementKey2019".into(),
-        _ => "bad key type".into()
+        _ => "bad key type".into(),
     }
 }
 
@@ -71,26 +64,27 @@ fn as_string(b: &Basic) -> String {
 // TODO: PROPER ERROR HANDLING!
 fn mem_parse(kel: impl AsRef<[u8]>) -> IdentifierState {
     signed_event_stream(kel.as_ref())
-        .unwrap().1
-        .into_iter().fold(vec!(), |mut accum, e| {
+        .unwrap()
+        .1
+        .into_iter()
+        .fold(vec![], |mut accum, e| {
             if let Deserialized::Event(ev) = e {
                 accum.push(ev.event);
-                accum 
-            } 
-            else { accum }
+                accum
+            } else {
+                accum
+            }
         })
         .iter()
-        .fold(IdentifierState::default(), |accum, e| accum.apply(&e.event).unwrap())
+        .fold(IdentifierState::default(), |accum, e| {
+            accum.apply(&e.event).unwrap()
+        })
 }
 
 #[cfg(test)]
 mod did_keri_tests {
     use super::*;
-    use crate::{
-        DdoParser,
-        resolve_any,
-        try_resolve_any,
-    };
+    use crate::{resolve_any, try_resolve_any, DdoParser};
     use base64_url::encode;
 
     #[test]
@@ -121,8 +115,14 @@ mod did_keri_tests {
         assert!(d.is_ok());
         let k = d.unwrap().find_public_key_for_curve("X25519");
         assert!(k.is_some());
-        let private_key = [32, 199, 55, 194, 109, 85, 48, 152, 86, 44, 207, 86, 238, 104, 152, 236, 164, 204, 88, 155, 212, 111, 146, 34, 111, 241, 4, 224, 165, 71, 180, 116]; 
-        let expected_public_key = [23, 34, 107, 21, 116, 24, 188, 54, 34, 43, 71, 59, 8, 178, 34, 177, 250, 186, 196, 239, 131, 210, 10, 163, 91, 68, 225, 181, 82, 142, 108, 123];
+        let private_key = [
+            32, 199, 55, 194, 109, 85, 48, 152, 86, 44, 207, 86, 238, 104, 152, 236, 164, 204, 88,
+            155, 212, 111, 146, 34, 111, 241, 4, 224, 165, 71, 180, 116,
+        ];
+        let expected_public_key = [
+            23, 34, 107, 21, 116, 24, 188, 54, 34, 43, 71, 59, 8, 178, 34, 177, 250, 186, 196, 239,
+            131, 210, 10, 163, 91, 68, 225, 181, 82, 142, 108, 123,
+        ];
         let k = k.unwrap();
         assert_eq!(k, expected_public_key);
 
@@ -135,7 +135,10 @@ mod did_keri_tests {
     #[test]
     fn resolve_any_keri_test() {
         let kerl_str = r#"{"v":"KERI10JSON000115_","i":"Eh9Gq4--Q1OVxJEL7M49-a5k7iEJATqSAxQiRLwJEja4","s":"0","t":"icp","kt":"1","k":["D7sD1K7bTfG4E8ObJa4Ecd6zuML1diINCvKXy_o1FK60","CFyJrFXQYvDYiK0c7CLIisfq6xO-D0gqjW0ThtVKObHs"],"n":"E1IzcG1u6Iy5onwrCG1AKcj9KUJ-0rbMq_t6yViIgv2U","wt":"0","w":[],"c":[]}-AABAAlccRMa44Jo07A_fuOwDP6Fu9_3PArGIKYCo7F9U8OC_02d5p26LuenliVDkmp7DV9hyYUHeWIug6PsIZlUlKAg"#;
-        let full_kerl_with_url = format!("did:keri:Eh9Gq4--Q1OVxJEL7M49-a5k7iEJATqSAxQiRLwJEja4?kerl={}", encode(kerl_str));
+        let full_kerl_with_url = format!(
+            "did:keri:Eh9Gq4--Q1OVxJEL7M49-a5k7iEJATqSAxQiRLwJEja4?kerl={}",
+            encode(kerl_str)
+        );
         let res = resolve_any(&full_kerl_with_url);
         assert!(res.is_some());
         let doc = res.unwrap();
@@ -146,7 +149,10 @@ mod did_keri_tests {
     #[test]
     fn try_resolve_any_keri_test() {
         let kerl_str = r#"{"v":"KERI10JSON000115_","i":"Eh9Gq4--Q1OVxJEL7M49-a5k7iEJATqSAxQiRLwJEja4","s":"0","t":"icp","kt":"1","k":["D7sD1K7bTfG4E8ObJa4Ecd6zuML1diINCvKXy_o1FK60","CFyJrFXQYvDYiK0c7CLIisfq6xO-D0gqjW0ThtVKObHs"],"n":"E1IzcG1u6Iy5onwrCG1AKcj9KUJ-0rbMq_t6yViIgv2U","wt":"0","w":[],"c":[]}-AABAAlccRMa44Jo07A_fuOwDP6Fu9_3PArGIKYCo7F9U8OC_02d5p26LuenliVDkmp7DV9hyYUHeWIug6PsIZlUlKAg"#;
-        let full_kerl_with_url = format!("did:keri:Eh9Gq4--Q1OVxJEL7M49-a5k7iEJATqSAxQiRLwJEja4?kerl={}", encode(kerl_str));
+        let full_kerl_with_url = format!(
+            "did:keri:Eh9Gq4--Q1OVxJEL7M49-a5k7iEJATqSAxQiRLwJEja4?kerl={}",
+            encode(kerl_str)
+        );
         let res = try_resolve_any(&full_kerl_with_url);
         assert!(res.is_ok());
         let doc = res.unwrap();
@@ -154,4 +160,3 @@ mod did_keri_tests {
         assert!(key.is_some());
     }
 }
-

@@ -19,10 +19,10 @@ pub enum Error {
     ConfigOpenError(String),
 
     #[error(transparent)]
-    Base64DecodeError(#[from]base64_url::base64::DecodeError),
+    Base64DecodeError(#[from] base64_url::base64::DecodeError),
 
     #[error(transparent)]
-    SerdeError(#[from]serde_json::Error),
+    SerdeError(#[from] serde_json::Error),
 
     #[error(transparent)]
     IoError(#[from] std::io::Error),
