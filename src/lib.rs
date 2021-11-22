@@ -156,12 +156,9 @@ pub fn resolve_any(did_url: &str) -> Option<Document> {
                 #[cfg(feature = "didkey")]
                 "key" => Box::new(DidKeyResolver {}),
                 #[cfg(feature = "keriox")]
-                "keri" => {
-                    println!("kerl should be here: {}", &caps["kerl"]);
-                    Box::new(DidKeriResolver::new(&String::from_utf8_lossy(
-                        &base64_url::decode(&caps["kerl"]).unwrap_or(vec![]),
-                    )))
-                }
+                "keri" => Box::new(DidKeriResolver::new(&String::from_utf8_lossy(
+                    &base64_url::decode(&caps["kerl"]).unwrap_or(vec![]),
+                ))),
                 #[cfg(feature = "didjolo")]
                 "jolo" => {}
                 #[cfg(feature = "didweb")]
