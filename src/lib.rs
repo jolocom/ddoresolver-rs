@@ -1,21 +1,21 @@
 pub mod error;
 
+#[cfg(feature = "jolo")]
+pub mod jolo;
 #[cfg(feature = "keriox")]
 pub mod keri;
 #[cfg(feature = "didkey")]
 pub mod key;
-#[cfg(feature = "jolo")]
-pub mod jolo;
 
-#[cfg(feature = "didkey")]
-use key::DidKeyResolver;
 #[cfg(feature = "keriox")]
 use crate::keri::DidKeriResolver;
+#[cfg(feature = "didkey")]
+use key::DidKeyResolver;
 
-pub use did_key::{Document, KeyFormat, VerificationMethod};
 use base58::FromBase58;
+pub use did_key::{Document, KeyFormat, VerificationMethod};
 use error::Error;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 /// # Universal trait for DID document resolver.
 /// Standardises signature for resolver output.
@@ -27,7 +27,7 @@ pub trait DdoResolver {
     /// `did_url` - proper DID url starts with "did:" followed up by
     ///     method name, path, etc. Details in spec:
     ///     https://www.w3.org/TR/did-core/#did-url-syntax
-    /// 
+    ///
     fn resolve(&self, did_url: &str) -> Result<Document, Error>;
 }
 
@@ -40,12 +40,12 @@ pub trait DdoParser {
     /// `pattern`. Returns `None` if no matching result found instead of error.
     ///
     fn find_key_agreement(&self, pattern: &str) -> Option<KeyAgreement>;
-    /// Searches all crypto matherial in the document for particular curve and 
+    /// Searches all crypto matherial in the document for particular curve and
     ///     returns FIRST! match for particular `curve`, which can be partial pattern.
     /// Returns `None` if no matching result found instead of error.
     ///
     fn find_public_key_for_curve(&self, curve: &str) -> Option<Vec<u8>>;
-    /// Method similar to `find_key_agreement`, but returns key `ID` instead of the 
+    /// Method similar to `find_key_agreement`, but returns key `ID` instead of the
     ///     key itself.
     /// Returns `None` if no matching result found instead of error.
     ///
@@ -59,24 +59,29 @@ pub trait DdoParser {
 impl DdoParser for Document {
     fn find_key_agreement(&self, pattern: &str) -> Option<KeyAgreement> {
         let agreements = self.key_agreement.clone();
-        if agreements.is_none() { return None; }
-        match agreements.unwrap()
-            .iter().find(|a| a.contains(pattern)) {
-                Some(a) => serde_json::from_str(a).unwrap_or(None),
-                None => None
-            }
+        if agreements.is_none() {
+            return None;
+        }
+        match agreements.unwrap().iter().find(|a| a.contains(pattern)) {
+            Some(a) => serde_json::from_str(a).unwrap_or(None),
+            None => None,
+        }
     }
     fn find_public_key_for_curve(&self, curve: &str) -> Option<Vec<u8>> {
-        if let Some(k) = self.verification_method.iter().find(|m| {
-            m.key_type.contains(curve)
-        }) {
+        if let Some(k) = self
+            .verification_method
+            .iter()
+            .find(|m| m.key_type.contains(curve))
+        {
             if let Some(key) = k.public_key.clone() {
                 match key {
                     KeyFormat::Base58(value) => Some(value.from_base58().unwrap()),
                     KeyFormat::Multibase(value) => Some(value),
-                    KeyFormat::JWK(_value) => todo!() // FIXME: proper return should be implemented
+                    KeyFormat::JWK(_value) => todo!(), // FIXME: proper return should be implemented
                 }
-            } else { None }
+            } else {
+                None
+            }
         } else {
             None
         }
@@ -85,15 +90,19 @@ impl DdoParser for Document {
         match get_public_key(self, curve) {
             Some(kf) => match kf {
                 KeyFormat::JWK(key) => key.key_id,
-                _ => None
+                _ => None,
             },
-            None => None
+            None => None,
         }
     }
     fn find_public_key_controller_for_curve(&self, curve: &str) -> Option<String> {
-        match self.verification_method.iter().find(|vm| vm.key_type.contains(curve)) {
+        match self
+            .verification_method
+            .iter()
+            .find(|vm| vm.key_type.contains(curve))
+        {
             Some(vm) => Some(vm.controller.to_owned()),
-            None => None
+            None => None,
         }
     }
 }
@@ -111,23 +120,24 @@ pub fn try_resolve_any(did_url: &str) -> Result<Document, Error> {
         Some(caps) => {
             match &caps["method"] {
                 #[cfg(feature = "didkey")]
-                "key" => DidKeyResolver{}.resolve(did_url)
+                "key" => DidKeyResolver {}
+                    .resolve(did_url)
                     .map_err(|e| error::Error::DidKeyError(e.to_string())),
                 #[cfg(feature = "keriox")]
-                "keri" => {
-                    match &caps["kerlid"] {
-                        "" => Err(error::Error::DidKeriError("kerl id not found".into())),
-                        _ => match &caps["kerl"] {
-                            "" => Err(error::Error::DidKeriError("kerl not found".into())),
-                            _ => DidKeriResolver::new(&String::from_utf8_lossy(&base64_url::decode(&caps["kerl"])?))
-                                    .resolve(&format!("did:keri:{}", &caps["id"]))
-                        }
-                    }
+                "keri" => match &caps["kerlid"] {
+                    "" => Err(error::Error::DidKeriError("kerl id not found".into())),
+                    _ => match &caps["kerl"] {
+                        "" => Err(error::Error::DidKeriError("kerl not found".into())),
+                        _ => DidKeriResolver::new(&String::from_utf8_lossy(&base64_url::decode(
+                            &caps["kerl"],
+                        )?))
+                        .resolve(&format!("did:keri:{}", &caps["id"])),
+                    },
                 },
-                _ => Err(error::Error::DidKeyError("not supported key url".into())) // TODO: separate descriptive error
+                _ => Err(error::Error::DidKeyError("not supported key url".into())), // TODO: separate descriptive error
             }
-        },
-        None => Err(error::Error::DidKeyError("not a did url".into())) // TODO: separate descriptive error
+        }
+        None => Err(error::Error::DidKeyError("not a did url".into())), // TODO: separate descriptive error
     }
 }
 
@@ -144,70 +154,69 @@ pub fn resolve_any(did_url: &str) -> Option<Document> {
         Some(caps) => {
             let resolver: Box<dyn DdoResolver> = match &caps["method"] {
                 #[cfg(feature = "didkey")]
-                "key" => Box::new(DidKeyResolver{}),
+                "key" => Box::new(DidKeyResolver {}),
                 #[cfg(feature = "keriox")]
-                "keri" => {
-                    println!("kerl should be here: {}", &caps["kerl"]);
-                    Box::new(
-                    DidKeriResolver::new(
-                        &String::from_utf8_lossy(&base64_url::decode(&caps["kerl"])
-                            .unwrap_or(vec!()))))
-                },
+                "keri" => Box::new(DidKeriResolver::new(&String::from_utf8_lossy(
+                    &base64_url::decode(&caps["kerl"]).unwrap_or(vec![]),
+                ))),
                 #[cfg(feature = "didjolo")]
-                "jolo" => {},
+                "jolo" => {}
                 #[cfg(feature = "didweb")]
-                "web" => {},
-                _ => return None
+                "web" => {}
+                _ => return None,
             };
             let parsed_url = format!("{}:{}:{}", &caps["prefix"], &caps["method"], &caps["id"]);
             match resolver.resolve(&parsed_url) {
                 Ok(doc) => Some(doc),
-                Err(_) => None
+                Err(_) => None,
             }
-        },
+        }
         None => None,
     }
 }
 
 // FIXME: complete this implementation
 pub fn get_sign_and_crypto_keys<'a>(ddo: &'a Document) -> (Option<&'a [u8]>, Option<&'a [u8]>) {
-    let _sign_key= ddo.verification_method.iter().fold(
-        None,
-        |_, vm| vm.public_key.iter().find(
-            |k| match k {
-                KeyFormat::JWK(key) => key.curve == "Ed25519",
-                _ => false
-            }));
-    let _crypto_key = ddo.verification_method.iter().find(|vm| vm.key_type == "X25519");
+    let _sign_key = ddo.verification_method.iter().fold(None, |_, vm| {
+        vm.public_key.iter().find(|k| match k {
+            KeyFormat::JWK(key) => key.curve == "Ed25519",
+            _ => false,
+        })
+    });
+    let _crypto_key = ddo
+        .verification_method
+        .iter()
+        .find(|vm| vm.key_type == "X25519");
     (None, None)
 }
 
 // Helper function to get full `KeyFormat` from the document by it's curve type
 pub(crate) fn get_public_key(doc: &Document, curve: &str) -> Option<KeyFormat> {
-    match doc.verification_method.iter().find(|m| {
-        match &m.public_key {
+    match doc
+        .verification_method
+        .iter()
+        .find(|m| match &m.public_key {
             Some(KeyFormat::JWK(jwk)) => jwk.curve.contains(curve),
-            _ => false
-        }
-    }) {
+            _ => false,
+        }) {
         Some(vm) => vm.public_key.clone(),
-        None => None
+        None => None,
     }
 }
 
 // Helper function to get key id from did url
 // # + id
 pub(crate) fn key_id_from_didurl(url: &str) -> String {
-    let re = regex::Regex::new(r"(?x)(?P<prefix>[did]{3}):(?P<method>[a-z]*):(?P<key_id>[a-zA-Z0-9]*)([:?/]?)(S)*??").unwrap();
-    match  re.captures(url) {
-        Some(s) =>
-            match s.name("key_id") {
-                Some(name) =>
-                    format!("#{}", name.as_str()),
-                None => String::default(),
-            },
-        None =>
-            String::default()
+    let re = regex::Regex::new(
+        r"(?x)(?P<prefix>[did]{3}):(?P<method>[a-z]*):(?P<key_id>[a-zA-Z0-9]*)([:?/]?)(S)*??",
+    )
+    .unwrap();
+    match re.captures(url) {
+        Some(s) => match s.name("key_id") {
+            Some(name) => format!("#{}", name.as_str()),
+            None => String::default(),
+        },
+        None => String::default(),
     }
 }
 
