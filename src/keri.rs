@@ -64,14 +64,9 @@ fn mem_parse(kel: impl AsRef<[u8]>) -> IdentifierState {
     signed_event_stream(kel.as_ref())
         .unwrap()
         .1
-        .into_iter()
-        .fold(vec![], |mut accum, e| {
-            accum.push(e.deserialized_event);
-            accum
-        })
         .iter()
         .fold(IdentifierState::default(), |accum, e| {
-            accum.apply(e).unwrap()
+            accum.apply(&e.deserialized_event).unwrap()
         })
 }
 
