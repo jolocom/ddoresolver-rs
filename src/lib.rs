@@ -15,7 +15,16 @@ use key::DidKeyResolver;
 use base58::FromBase58;
 pub use did_key::{Document, KeyFormat, VerificationMethod};
 use error::Error;
+use lazy_static::lazy_static;
+use regex::Regex;
 use serde::{Deserialize, Serialize};
+
+lazy_static! {
+    static ref DID_REGEX: Regex = Regex::new(
+        r"(?x)(?P<prefix>[did]{3}):(?P<method>[a-z]*):(?P<key_id>[a-zA-Z0-9]*)([:?/]?)(S)*??",
+    )
+    .unwrap();
+}
 
 /// # Universal trait for DID document resolver.
 /// Standardises signature for resolver output.
@@ -207,17 +216,25 @@ pub(crate) fn get_public_key(doc: &Document, curve: &str) -> Option<KeyFormat> {
 // Helper function to get key id from did url
 // # + id
 pub(crate) fn key_id_from_didurl(url: &str) -> String {
-    let re = regex::Regex::new(
-        r"(?x)(?P<prefix>[did]{3}):(?P<method>[a-z]*):(?P<key_id>[a-zA-Z0-9]*)([:?/]?)(S)*??",
-    )
-    .unwrap();
-    match re.captures(url) {
+    match DID_REGEX.captures(url) {
         Some(s) => match s.name("key_id") {
             Some(name) => format!("#{}", name.as_str()),
             None => String::default(),
         },
         None => String::default(),
     }
+}
+
+// Parses and String formats prefix:method:key_id from given &str
+//
+pub fn did_id_from_url(url: &str) -> Option<String> {
+    let captures = DID_REGEX.captures(url)?;
+    Some(format!(
+        "{}:{}:{}",
+        captures.name("prefix")?.as_str(),
+        captures.name("method")?.as_str(),
+        captures.name("key_id")?.as_str()
+    ))
 }
 
 /// "Temporary" struct to extend did_key crate's `Document` with `KeyAgreement` instead of string.
@@ -230,4 +247,25 @@ pub struct KeyAgreement {
     pub controller: String,
     #[serde(rename = "publicKeyBase58")]
     pub public_key_base58: String,
+}
+
+#[test]
+fn did_id_from_url_test() {
+    let keri = "did:keri:someiderNTIFIER2345432?bunch_of_niose!_$(#)";
+    let key = "did:key:bu03rlnth4gpk09y4cr3DEGCTHUDGc45RCGUCH?again_some_rubbish";
+    let long = "did:verylongid:BXDHCG8765678THDIYFGCRNWMBXIF34543HDGC?MOREnoise_?";
+    let not_a_did = "thisisnot_a_did";
+    assert_eq!(
+        &did_id_from_url(keri).unwrap(),
+        "did:keri:someiderNTIFIER2345432"
+    );
+    assert_eq!(
+        &did_id_from_url(key).unwrap(),
+        "did:key:bu03rlnth4gpk09y4cr3DEGCTHUDGc45RCGUCH"
+    );
+    assert_eq!(
+        &did_id_from_url(long).unwrap(),
+        "did:verylongid:BXDHCG8765678THDIYFGCRNWMBXIF34543HDGC"
+    );
+    assert!(did_id_from_url(not_a_did).is_none());
 }

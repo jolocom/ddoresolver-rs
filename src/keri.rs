@@ -1,7 +1,5 @@
 use keri::{
-    derivation::basic::Basic,
-    event_message::parse::{signed_event_stream, Deserialized},
-    prefix::Prefix,
+    derivation::basic::Basic, event_parsing::message::signed_event_stream, prefix::Prefix,
     state::IdentifierState,
 };
 
@@ -68,16 +66,12 @@ fn mem_parse(kel: impl AsRef<[u8]>) -> IdentifierState {
         .1
         .into_iter()
         .fold(vec![], |mut accum, e| {
-            if let Deserialized::Event(ev) = e {
-                accum.push(ev.deserialized_event);
-                accum
-            } else {
-                accum
-            }
+            accum.push(e.deserialized_event);
+            accum
         })
         .iter()
         .fold(IdentifierState::default(), |accum, e| {
-            accum.apply(&e.event_message).unwrap()
+            accum.apply(e).unwrap()
         })
 }
 
