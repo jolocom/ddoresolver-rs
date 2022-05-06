@@ -21,7 +21,7 @@ use serde::{Deserialize, Serialize};
 
 lazy_static! {
     static ref DID_REGEX: Regex = Regex::new(
-        r"(?x)(?P<prefix>[did]{3}):(?P<method>[a-z]*):(?P<key_id>[a-zA-Z0-9]*)([:?/]?)(S)*??",
+        r"(?x)(?P<prefix>[did]{3}):(?P<method>[a-z]*):(?P<key_id>[-_a-zA-Z0-9]*)([:?/]?)(S)*??",
     )
     .unwrap();
 }
@@ -124,7 +124,7 @@ impl DdoParser for Document {
 /// Output is `Document` or `Error`.
 ///
 pub fn try_resolve_any(did_url: &str) -> Result<Document, Error> {
-    let re = regex::Regex::new(r"^((?P<prefix>did){1}:(?P<method>[a-z]*){1}:(?P<id>.+?))((?P<kerlid>\?kerl=)(?P<kerl>[a-zA-Z0-9]+?))?$").unwrap();
+    let re = regex::Regex::new(r"^((?P<prefix>did){1}:(?P<method>[-_A-Za-z0-9]*){1}:(?P<id>.+?))((?P<kerlid>\?kerl=)(?P<kerl>[a-zA-Z0-9]+?))?$").unwrap();
     match re.captures(did_url) {
         Some(caps) => {
             match &caps["method"] {
@@ -158,7 +158,7 @@ pub fn try_resolve_any(did_url: &str) -> Result<Document, Error> {
 /// Output is Option: `Some(Document)` or `None`. Will never fail with error.
 ///
 pub fn resolve_any(did_url: &str) -> Option<Document> {
-    let re = regex::Regex::new(r"^((?P<prefix>did){1}:(?P<method>[a-z]*){1}:(?P<id>.+?))((?P<kerlid>\?kerl=)(?P<kerl>[a-zA-Z0-9]+?))?$").unwrap();
+    let re = regex::Regex::new(r"^((?P<prefix>did){1}:(?P<method>[-_a-zA-Z0-9]*){1}:(?P<id>.+?))((?P<kerlid>\?kerl=)(?P<kerl>[a-zA-Z0-9]+?))?$").unwrap();
     match re.captures(did_url) {
         Some(caps) => {
             let resolver: Box<dyn DdoResolver> = match &caps["method"] {
@@ -252,12 +252,17 @@ pub struct KeyAgreement {
 #[test]
 fn did_id_from_url_test() {
     let keri = "did:keri:someiderNTIFIER2345432?bunch_of_niose!_$(#)";
+    let keri_sym = "did:keri:D1bkcOzM-YwEXKPc5yHbMzkHRrZS3O6QAVEpGsS0XpF_E";
     let key = "did:key:bu03rlnth4gpk09y4cr3DEGCTHUDGc45RCGUCH?again_some_rubbish";
     let long = "did:verylongid:BXDHCG8765678THDIYFGCRNWMBXIF34543HDGC?MOREnoise_?";
     let not_a_did = "thisisnot_a_did";
     assert_eq!(
         &did_id_from_url(keri).unwrap(),
         "did:keri:someiderNTIFIER2345432"
+    );
+    assert_eq!(
+        &did_id_from_url(keri_sym).unwrap(),
+        "did:keri:D1bkcOzM-YwEXKPc5yHbMzkHRrZS3O6QAVEpGsS0XpF_E"
     );
     assert_eq!(
         &did_id_from_url(key).unwrap(),
