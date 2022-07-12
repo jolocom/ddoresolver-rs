@@ -1,17 +1,15 @@
 use crate::{DdoResolver, Error};
+mod ipfs;
 #[cfg(feature = "registrar")]
 use did_key::Document;
-use ipfs_api::IpfsClient;
+use ipfs::IpfsApiClient;
 use serde::Deserialize;
 use std::fs;
-#[cfg(feature = "registrar")]
-use std::io::Cursor;
 #[cfg(feature = "registrar")]
 use web3::types::{H160, U256};
 use web3::{
     contract::{Contract, Options},
     ethabi::Token,
-    futures::StreamExt,
     transports::Http,
     types::Address,
     Web3,
@@ -37,7 +35,7 @@ pub struct JoloConfig {
 pub struct JoloResolver {
     contract: Contract<Http>,
     _w3: Web3<Http>,
-    client: IpfsClient,
+    client: IpfsApiClient,
 }
 
 impl JoloResolver {
@@ -47,7 +45,7 @@ impl JoloResolver {
     ///     URL for HTTP transport should be provided;
     /// `contract_address` - Jolo resolver Ethereum contract address;
     /// `ipfs_endpoint` - entry point for IPFS resolution.
-    ///     base URL only! ### Example: https://ipfs.jolocom.com:443
+    ///     base URL only! ### Example: https://ipfs.jolocom.com:443/
     ///
     pub fn new(
         provider_address: &str,
@@ -57,8 +55,7 @@ impl JoloResolver {
         let http = Http::new(provider_address)?;
         let _w3 = Web3::new(http);
         let c_address = Address::from_slice(&hex::decode(contract_address)?);
-        let ipfs_client: IpfsClient = ipfs_api::TryFromUri::from_str(ipfs_endpoint)
-            .map_err(|e| Error::UriParseError(e.to_string()))?;
+        let ipfs_client = IpfsApiClient::new(ipfs_endpoint);
         Ok(Self {
             contract: Contract::from_json(
                 _w3.eth(),
@@ -110,20 +107,13 @@ impl JoloResolver {
     /// `hash` - hash returned by `resolve_record()` method;
     ///
     pub async fn get_ipfs_record(&self, hash: &str) -> Result<String, Error> {
-        let full_path = format!("api/v0/cat/{}", hash);
-        let (ddo, _) = self.client.get(&full_path).into_future().await;
-        match ddo {
-            Some(Ok(bytes)) => Ok(String::from_utf8(bytes.as_ref().to_vec())?),
-            Some(Err(e)) => Err(Error::IpfsResponseError(e.to_string())),
-            _ => Err(Error::DidResolutionFailed),
-        }
+        self.client.get(hash).await
     }
 
     #[cfg(feature = "registrar")]
     async fn store_ipfs_record(&self, document: String) -> Result<String, Error> {
-        let cursor = Cursor::new(document);
-        match self.client.add(cursor).await {
-            Ok(res) => Ok(res.hash),
+        match self.client.add(document).await {
+            Ok(res) => Ok(res),
             Err(e) => Err(Error::IpfsResponseError(e.to_string())),
         }
     }
@@ -219,36 +209,27 @@ fn eth_address_from_str() {
 #[tokio::test]
 async fn rinkeby_resolve() {
     let config = read_config(RINKEBY).unwrap();
-    let test_user_did = "did:jolo:f334484858571199b681f6dfdd9ecd2f01df5b38f8379b3aaa89436c61fd1955";
+    let test_user_did = "did:jolo:338a99de7bf54b4949590f4934d74b171bddf3812ddd92a60563b50d19f590bc";
     let resolver = JoloResolver::new(
         &config.provider_url,
         &config.contract_address,
         &config.ipfs_endpoint,
     );
     assert!(resolver.is_ok());
-    let response = resolver.unwrap().resolve_record(test_user_did.into()).await;
-    assert!(response.is_ok());
-}
 
-#[cfg(test)]
-#[tokio::test]
-async fn ipfs_resolve() {
-    let ddo_hash = "0298a5f231fc9224ca466bdbd0b27cb34d27939d0e8aa4b65ba4ef1ed805f14975";
-    let resolver = JoloResolver::new_from_cfg(RINKEBY);
-    assert!(resolver.is_ok());
-    let ddo = resolver.unwrap().get_ipfs_record(ddo_hash).await;
-    if ddo.is_err() {
-        println!("{:?}", ddo);
-    }
-    assert!(ddo.is_ok());
+    let response = resolver.unwrap().resolve_record(test_user_did.into()).await;
+
+    assert!(response.is_ok());
 }
 
 #[test]
 fn jolo_doc_resolver() {
     let resolver = JoloResolver::new_from_cfg(RINKEBY).unwrap();
+
     let doc = resolver
-        .resolve("did:jolo:f334484858571199b681f6dfdd9ecd2f01df5b38f8379b3aaa89436c61fd1955")
+        .resolve("did:jolo:e76fb4b4900e43891f613066b9afca366c6d22f7d87fc9f78a91515be24dfb21")
         .unwrap();
+
     use crate::DdoParser;
     let key = doc.find_public_key_for_curve("ED");
     assert!(key.is_some());
