@@ -112,10 +112,10 @@ impl JoloResolver {
 
     #[cfg(feature = "registrar")]
     async fn store_ipfs_record(&self, document: String) -> Result<String, Error> {
-        match self.client.add(document).await {
-            Ok(res) => Ok(res),
-            Err(e) => Err(Error::IpfsResponseError(e.to_string())),
-        }
+        self.client
+            .add(document)
+            .await
+            .map_err(|e| Error::IpfsResponseError(e.to_string()))
     }
 
     /// Full async resolver.

@@ -98,7 +98,6 @@ mod ipfs_tests {
         if ddo.is_err() {
             println!("{:?}", ddo);
         }
-        println!("{:?}", ddo);
         assert!(ddo.is_ok());
     }
 
